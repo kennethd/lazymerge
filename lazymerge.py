@@ -67,12 +67,12 @@ def lazymerge(*streams):
         min_head = min(heads)
         yield min_head
         s = heads[min_head]
+        del heads[min_head]
         try:
             next_s = next(s)
+            heads[next_s] = s
         except StopIteration:
             pass
-        heads[next_s] = s
-        del heads[min_head]
 
 
 def main():

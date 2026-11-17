@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import datetime
 import functools
+import string
 import sys
 import time
 
@@ -35,8 +36,8 @@ log(f'Using Python {sys.version.split(" ")[0]}')
 log(f'Using Python {sys.version.split(" ")[0]}')
 
 
-def log_generator(stream_name, stop_at=99, pause_every=0, pause_length=0.5):
-    """generator that yields {stop_at} messages, pausing for {pause_length}
+def log_generator(stream_name, msg_count, pause_every=0, pause_length=0.5):
+    """generator that yields {msg_count} messages, pausing for {pause_length}
     every {pause_every} seconds"""
 
     @with_unique_ts_pfx
@@ -44,7 +45,7 @@ def log_generator(stream_name, stop_at=99, pause_every=0, pause_length=0.5):
         return s
 
     count = 1
-    for i in range(stop_at):
+    for i in range(msg_count):
         msg = f'Stream {stream_name} msg {count} pausing every {pause_every} for {pause_length} seconds'
         yield _log(msg)
         count += 1
@@ -54,7 +55,7 @@ def log_generator(stream_name, stop_at=99, pause_every=0, pause_length=0.5):
 
 
 def lazymerge(*streams):
-    """*streams being a series of iterators each emitting a timestamp-prefixed
+    """*streams being a series of generators each emitting a timestamp-prefixed
     string, this generator yields one message at a time from all upstream
     inputs in sorted order"""
     log(f'lazymerge: merging/sorting input from {len(streams)} upstream sources')
@@ -64,7 +65,7 @@ def lazymerge(*streams):
     log(heads)
     while len(heads):
         min_head = min(heads)
-        log(f'min_head is {min_head}')
+        yield min_head
         s = heads[min_head]
         try:
             next_s = next(s)
@@ -76,10 +77,14 @@ def lazymerge(*streams):
 
 def main():
     streams = []
-    streams.append(log_generator('A', pause_every=4))
-    streams.append(log_generator('B', pause_every=2))
-    streams.append(log_generator('C', pause_every=3))
-    lazymerge(*streams)
+    for i, c in enumerate(string.ascii_uppercase):
+        msg_count = 26 - i
+        # i=0 c=A msg_count=26
+        # ...
+        # i=25 c=Z msg_count=1
+        streams.append(log_generator(c, msg_count, pause_every=i))
+    for log in lazymerge(*streams):
+        print(log, file=sys.stdout)
 
 
 if __name__ == '__main__':

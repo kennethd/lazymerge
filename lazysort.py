@@ -5,16 +5,20 @@ import sys
 import time
 
 
+global_iter = 0
+
 def with_unique_ts_pfx(func):
     """decorator that wraps a function whose first argument is a string; that
     first argument will be prefixed with a unique timestamp"""
 
     @functools.wraps(func)
     def unique_ts(s, *args, **kwargs):
+        global global_iter
+        global_iter += 1
         unique_ts.seconds_incr += 1
         ts = datetime.datetime.now().replace(microsecond=0)
         logtime = ts + datetime.timedelta(seconds=unique_ts.seconds_incr)
-        return func(f'{logtime}: {s}', *args, **kwargs)
+        return func(f'{logtime} ({global_iter}): {s}', *args, **kwargs)
 
     unique_ts.seconds_incr = 0
     return unique_ts
@@ -41,9 +45,12 @@ def log_generator(stream_name, stop_at=99, pause_every=0, pause_length=0.5):
 
     count = 1
     for i in range(stop_at):
-        msg = f'Stream {stream_name} Message {count}'
+        msg = f'Stream {stream_name} msg {count} pausing every {pause_every} for {pause_length} seconds'
         yield _log(msg)
         count += 1
+        if pause_every and not count % pause_every:
+            log(f'pausing stream {stream_name}')
+            time.sleep(pause_length)
 
 
 def lazymerge(*streams):
@@ -55,11 +62,23 @@ def lazymerge(*streams):
     for s in streams:
         heads[next(s)] = s
     log(heads)
+    while len(heads):
+        min_head = min(heads)
+        log(f'min_head is {min_head}')
+        s = heads[min_head]
+        try:
+            next_s = next(s)
+        except StopIteration:
+            pass
+        heads[next_s] = s
+        del heads[min_head]
 
 
 def main():
     streams = []
-    streams.append(log_generator('A'))
+    streams.append(log_generator('A', pause_every=4))
+    streams.append(log_generator('B', pause_every=2))
+    streams.append(log_generator('C', pause_every=3))
     lazymerge(*streams)
 
 
